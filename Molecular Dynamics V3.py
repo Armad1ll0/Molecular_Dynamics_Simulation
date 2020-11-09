@@ -190,7 +190,7 @@ for i in range(number_particles):
 total_energy = total_kinetic + potential_energy
 
 #constants needed for iterations, N is number of time steps and dt is the change in time
-num_time_steps = 100
+num_time_steps = 1000
 dt = 0.01
 
 #these are the arrays we will add stuff to. We can use hstack method to add a new array to the end of an array 
@@ -224,12 +224,12 @@ y_velocity = np.array(y_velocity)
 
 x_pos_particle_2 = []
 for i in range(len(x_pos_particle_1)):
-    new_x_position = x_pos_particle_1[i] + x_velocity[i]*dt + (0.5*force_x[i]*(dt**2))/m
+    new_x_position = (x_pos_particle_1[i] + x_velocity[i]*dt + (0.5*force_x[i]*(dt**2))/m)%lx
     x_pos_particle_2.append(new_x_position)
 
 y_pos_particle_2 = []
 for i in range(len(y_pos_particle_1)):
-    new_y_position = y_pos_particle_1[i] + y_velocity[i]*dt + (0.5*force_y[i]*(dt**2))/m
+    new_y_position = (y_pos_particle_1[i] + y_velocity[i]*dt + (0.5*force_y[i]*(dt**2))/m)%lx
     y_pos_particle_2.append(new_y_position)
 
 #===================================================================================================================
@@ -237,47 +237,51 @@ for i in range(len(y_pos_particle_1)):
 #have a look at the puesdocode but this is the first stage we need to put in a loop 
 counter = 2 #this is because we have already calculated the first couple of positions before, so technically the first run of the loop is on the third time step 
 #this is a frequency counter asked for in the paper 
-f_log = 5 
+f_log = 20
 while counter < num_time_steps:
     positions_array_for_force_calc = np.array((x_pos_particle_2, y_pos_particle_2)).T
     force_x = np.zeros(number_particles)
     force_y = np.zeros(number_particles)
     for i in range(number_particles):
-        for j in range(number_particles):
-            if i == j:
-                continue
-            else: 
-                atom1 = positions_array_for_force_calc[i]
-                atom2 = positions_array_for_force_calc[j]
-                #boundary conditions 
-                #distance in the x coords of atoms 
-                dx = atom1[0] - atom2[0]
-                #distance in the y coords of atoms 
-                dy = atom1[1] - atom2[1]
-                #if the value of dx is smaller when we pass it through the boundary then change it 
-                if lx - dx%lx < dx:
-                    dx = abs(lx-(dx%lx))
-                #same witht eh y condition 
-                if lx - dy%lx < dy:
-                    dy = abs((lx-(dy%lx)))
-                #if the radius is smaller than the cut off (lennard jones potential is basically 0 after 2.5)
-                if ((dx**2) + (dy**2))**0.5 < r_cutoff:
-                    r = (dx**2 + dy**2)**0.5
-                    #differential of lennard jones potential 
-                    F = -4*epsilon*(((12*(sigma**12))/r**13) - (((alpha*6*(sigma**6))/r**7)))
-                    #unit values for each direction so we can seperate force into x and y units in the list. 
-                    x_unit = (atom1[0]-atom2[0])/r
-                    y_unit = (atom1[1]-atom2[1])/r
-                    force_x[i] += F*x_unit
-                    force_y[i] += F*y_unit
+        for j in range(i+1, number_particles): 
+            atom1 = positions_array_for_force_calc[i]
+            atom2 = positions_array_for_force_calc[j]
+            #boundary conditions 
+            #distance in the x coords of atoms 
+            dx = atom1[0] - atom2[0]
+            #distance in the y coords of atoms 
+            dy = atom1[1] - atom2[1]
+            #if the value of dx is smaller when we pass it through the boundary then change it 
+            if lx - dx%lx < dx:
+                dx = abs(lx-(dx%lx))
+            #same witht eh y condition 
+            if lx - dy%lx < dy:
+                dy = abs((lx-(dy%lx)))
+            #if the radius is smaller than the cut off (lennard jones potential is basically 0 after 2.5)
+            if ((dx**2) + (dy**2))**0.5 < r_cutoff:
+                r = (dx**2 + dy**2)**0.5
+                #differential of lennard jones potential 
+                F = -4*epsilon*(((12*(sigma**12))/r**13) - (((alpha*6*(sigma**6))/r**7)))
+                #unit values for each direction so we can seperate force into x and y units in the list. 
+                x_unit = (atom1[0]-atom2[0])/r
+                y_unit = (atom1[1]-atom2[1])/r
+                force_x[i] += F*x_unit
+                force_y[i] += F*y_unit
+                force_x[j] -= F*x_unit
+                force_y[j] -= F*y_unit
     
+    #below is to check whether the sum of the forces are roughly = 0 
+# =============================================================================
+#     x = sum(force_x) + sum(force_y)
+#     print('the sum of the forces is ', + x)
+# =============================================================================
     #then we will use this function to calculate the new positions based off the 2 previous lists. 
     x_pos_particle_3 = []
     y_pos_particle_3 = []
     for i in range(number_particles):
-        new_x_position = 2*x_pos_particle_2[i] - x_pos_particle_1[i] + (force_x[i]/m)*(dt**2)
+        new_x_position = (2*x_pos_particle_2[i] - x_pos_particle_1[i] + (force_x[i]/m)*(dt**2))%lx
         x_pos_particle_3.append(new_x_position)
-        new_y_position = 2*y_pos_particle_2[i] - y_pos_particle_1[i] + (force_y[i]/m)*(dt**2)
+        new_y_position = (2*y_pos_particle_2[i] - y_pos_particle_1[i] + (force_y[i]/m)*(dt**2))%lx
         y_pos_particle_3.append(new_y_position)
         
     #then we create the new velocity 
@@ -333,17 +337,37 @@ while counter < num_time_steps:
     #total energy of the system 
     total_energy = total_kinetic + potential_energy
     counter += 1
+
     if counter%f_log == 0:
         print('KE =', total_kinetic)
         print('PE =', potential_energy)
         print('Total Energy =', total_kinetic + potential_energy)
         print('The new Temperature of the system is', T_new)
+
     
-    #then we need to reassign the names of the lists so they get iterated between over and over again 
-    x_pos_particle_1 = x_pos_particle_2 
-    y_pos_particle_1 = y_pos_particle_2 
-    x_pos_particle_2 = x_pos_particle_3 
-    y_pos_particle_2 = y_pos_particle_3
+    #then we need to reassign the names of the lists so they get iterated between over and over again. Thi is a long winded way so i understand what is going on.  
+    oldest_x = x_pos_particle_1 
+    old_x = x_pos_particle_2
+    not_old_x = x_pos_particle_3
+    
+    oldest_x = []
+    oldest_x = old_x
+    old_x = not_old_x
+    
+    x_pos_particle_1 = oldest_x
+    x_pos_particle_2 = old_x
+    
+    oldest_y = y_pos_particle_1 
+    old_y = y_pos_particle_2
+    not_old_y = y_pos_particle_3
+    
+    oldest_y = []
+    oldest_y = old_y
+    old_y = not_old_y
+    
+    y_pos_particle_1 = oldest_y
+    y_pos_particle_2 = old_y
+    
     
 #===================================================================================================================
 
